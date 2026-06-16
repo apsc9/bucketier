@@ -4,6 +4,9 @@ pub mod pyth;
 pub mod errors;
 pub mod state;
 pub mod math;
+pub mod instructions;
+
+pub use instructions::*;
 
 declare_id!("9FJcX3zua4QdtxtBpKeHUy4JvxBHpEbqbHLKdp9Y4ya3");
 
@@ -11,11 +14,7 @@ declare_id!("9FJcX3zua4QdtxtBpKeHUy4JvxBHpEbqbHLKdp9Y4ya3");
 pub mod bucketier {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
+    pub fn create_market(ctx: Context<CreateMarket>, args: CreateMarketArgs) -> Result<()> {
+        instructions::create_market::handler(ctx, args)
     }
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}
