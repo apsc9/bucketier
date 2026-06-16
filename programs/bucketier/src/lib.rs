@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 pub mod pyth;
 pub mod errors;
 pub mod state;
+pub mod math;
 
 declare_id!("9FJcX3zua4QdtxtBpKeHUy4JvxBHpEbqbHLKdp9Y4ya3");
 
