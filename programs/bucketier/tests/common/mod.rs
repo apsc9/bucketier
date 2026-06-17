@@ -195,3 +195,28 @@ pub fn market_with_bettors(svm: &mut LiteSVM, payer: &Keypair, n: usize) -> (Pub
     }).collect();
     (market, bettors)
 }
+
+pub fn cancel_ix(market: &Pubkey, caller: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: program_id(),
+        accounts: vec![
+            AccountMeta::new_readonly(*caller, true),
+            AccountMeta::new(*market, false),
+        ],
+        data: anchor_disc("cancel_market"),
+    }
+}
+
+pub fn refund_ix(market: &Pubkey, owner: &Pubkey, bucket: u8) -> Instruction {
+    Instruction {
+        program_id: program_id(),
+        accounts: vec![
+            AccountMeta::new(*owner, true),
+            AccountMeta::new_readonly(*market, false),
+            AccountMeta::new(position_pda(market, owner, bucket), false),
+            AccountMeta::new(vault_pda(market), false),
+            AccountMeta::new_readonly(system_program::ID, false),
+        ],
+        data: anchor_disc("claim_refund"),
+    }
+}

@@ -2,7 +2,7 @@ mod common;
 use common::*;
 use anchor_lang::AccountDeserialize;
 use bucketier::state::{Market, MarketState};
-use solana_sdk::signature::Signer;
+use solana_sdk::signature::{Keypair, Signer};
 
 fn load_market(svm: &litesvm::LiteSVM, pk: &solana_sdk::pubkey::Pubkey) -> Market {
     let acc = svm.get_account(pk).unwrap();
@@ -84,4 +84,43 @@ fn place_bet_rejections() {
     warp_to(&mut svm, target);
     let err = send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 3, SOL), &[]).unwrap_err();
     assert!(err.contains("BettingWindowClosed"), "{err}");
+}
+
+#[test]
+fn cancel_empty_market_by_authority() {
+    let (mut svm, payer) = setup();
+    let (market, _) = market_with_bettors(&mut svm, &payer, 0);
+    send(&mut svm, &payer, cancel_ix(&market, &payer.pubkey()), &[]).unwrap();
+    assert_eq!(load_market(&svm, &market).state, MarketState::Canceled);
+}
+
+#[test]
+fn cancel_with_bets_rejected_until_deadline_then_permissionless() {
+    let (mut svm, payer) = setup();
+    let (market, bettors) = market_with_bettors(&mut svm, &payer, 1);
+    let a = &bettors[0];
+    send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 3, SOL), &[]).unwrap();
+
+    // authority cannot void a market with live bets 
+    let err = send(&mut svm, &payer, cancel_ix(&market, &payer.pubkey()), &[]).unwrap_err();
+    assert!(err.contains("CancelNotAllowed"), "{err}");
+
+    // …but anyone can after resolve_deadline (oracle-failure backstop)
+    let target = now(&svm) + 1001;
+    warp_to(&mut svm, target);
+    let rando = Keypair::new();
+    svm.airdrop(&rando.pubkey(), SOL).unwrap();
+    send(&mut svm, &rando, cancel_ix(&market, &rando.pubkey()), &[]).unwrap();
+    assert_eq!(load_market(&svm, &market).state, MarketState::Canceled);
+
+    // refund returns exact stake and closes the position
+    let before = svm.get_account(&a.pubkey()).unwrap().lamports;
+    send(&mut svm, a, refund_ix(&market, &a.pubkey(), 3), &[]).unwrap();
+    let after = svm.get_account(&a.pubkey()).unwrap().lamports;
+    assert!(after > before + SOL - 100_000); // stake + position rent back, minus tx fee
+    assert!(svm.get_account(&position_pda(&market, &a.pubkey(), 3)).map_or(true, |acc| acc.lamports == 0));
+
+    // double refund impossible — position is gone
+    let err = send(&mut svm, a, refund_ix(&market, &a.pubkey(), 3), &[]).unwrap_err();
+    assert!(err.contains("AccountNotInitialized") || err.contains("Error"), "{err}");
 }

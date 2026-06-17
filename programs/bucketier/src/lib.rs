@@ -21,4 +21,12 @@ pub mod bucketier {
     pub fn place_bet(ctx: Context<PlaceBet>, bucket_index: u8, amount: u64) -> Result<()> {
         instructions::place_bet::handler(ctx, bucket_index, amount)
     }
+
+    pub fn cancel_market(ctx: Context<CancelMarket>) -> Result<()> {
+        instructions::cancel_market::handler(ctx)
+    }
+    
+    pub fn claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
+        instructions::claim_refund::handler(ctx)
+    }
 }
