@@ -47,3 +47,41 @@ fn create_market_rejects_bad_buckets() {
         assert!(err.contains("InvalidParams"), "{err}");
     }
 }
+
+#[test]
+fn place_bet_happy_and_accumulating() {
+    let (mut svm, payer) = setup();
+    let (market, bettors) = market_with_bettors(&mut svm, &payer, 2);
+    let (a, b) = (&bettors[0], &bettors[1]);
+
+    send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 3, SOL), &[]).unwrap();
+    send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 3, SOL), &[]).unwrap(); // same bucket: accumulates
+    send(&mut svm, b, place_bet_ix(&market, &b.pubkey(), 5, 2 * SOL), &[]).unwrap();
+
+    let m = load_market(&svm, &market);
+    assert_eq!(m.total_pool, 4 * SOL);
+    assert_eq!(m.bucket_totals[3], 2 * SOL);
+    assert_eq!(m.bucket_totals[5], 2 * SOL);
+
+    let vault = svm.get_account(&vault_pda(&market)).unwrap();
+    assert_eq!(vault.lamports, 4 * SOL + svm.minimum_balance_for_rent_exemption(0));
+}
+
+#[test]
+fn place_bet_rejections() {
+    let (mut svm, payer) = setup();
+    let (market, bettors) = market_with_bettors(&mut svm, &payer, 1);
+    let a = &bettors[0];
+
+    // bucket out of range
+    let err = send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 7, SOL), &[]).unwrap_err();
+    assert!(err.contains("InvalidBucket"), "{err}");
+    // below min bet (min is 0.01 SOL)
+    let err = send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 3, SOL / 1000), &[]).unwrap_err();
+    assert!(err.contains("BetTooSmall"), "{err}");
+    // after betting_close
+    let target = now(&svm) + 101;
+    warp_to(&mut svm, target);
+    let err = send(&mut svm, a, place_bet_ix(&market, &a.pubkey(), 3, SOL), &[]).unwrap_err();
+    assert!(err.contains("BettingWindowClosed"), "{err}");
+}

@@ -108,9 +108,11 @@ pub fn send(
         &signers,
         svm.latest_blockhash(),
     );
-    svm.send_transaction(tx)
+    let result = svm.send_transaction(tx)
         .map(|_| ())
-        .map_err(|e| decode_tx_error(&format!("{:?}", e.err)))
+        .map_err(|e| decode_tx_error(&format!("{:?}", e.err)));
+    svm.expire_blockhash();
+    result
 }
 
 fn anchor_disc(name: &str) -> Vec<u8> {
@@ -159,4 +161,37 @@ pub fn create_market_ix(
         ],
         data,
     }
+}
+
+pub fn place_bet_ix(market: &Pubkey, bettor: &Pubkey, bucket: u8, amount: u64) -> Instruction {
+    let mut data = anchor_disc("place_bet");
+    let mut buf = Vec::new();
+    bucket.serialize(&mut buf).unwrap();
+    amount.serialize(&mut buf).unwrap();
+    data.extend(buf);
+
+    Instruction {
+        program_id: program_id(),
+        accounts: vec![
+            AccountMeta::new(*bettor, true),
+            AccountMeta::new(*market, false),
+            AccountMeta::new(position_pda(market, bettor, bucket), false),
+            AccountMeta::new(vault_pda(market), false),
+            AccountMeta::new_readonly(system_program::ID, false),
+        ],
+        data,
+    }
+}
+
+/// create market id=1 with default args + n funded bettors; returns (market_pk, bettors)
+pub fn market_with_bettors(svm: &mut LiteSVM, payer: &Keypair, n: usize) -> (Pubkey, Vec<Keypair>) {
+    let args = default_args(svm, 1);
+    send(svm, payer, create_market_ix(&payer.pubkey(), args), &[]).unwrap();
+    let market = market_pda(&payer.pubkey(), 1);
+    let bettors: Vec<Keypair> = (0..n).map(|_| {
+        let k = Keypair::new();
+        svm.airdrop(&k.pubkey(), 50 * SOL).unwrap();
+        k
+    }).collect();
+    (market, bettors)
 }

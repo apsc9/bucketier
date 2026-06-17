@@ -17,4 +17,8 @@ pub mod bucketier {
     pub fn create_market(ctx: Context<CreateMarket>, args: CreateMarketArgs) -> Result<()> {
         instructions::create_market::handler(ctx, args)
     }
+
+    pub fn place_bet(ctx: Context<PlaceBet>, bucket_index: u8, amount: u64) -> Result<()> {
+        instructions::place_bet::handler(ctx, bucket_index, amount)
+    }
 }
