@@ -62,6 +62,21 @@ pub fn payout(
     Ok(s2 as u64)
 }
 
+/// Rescale Pyth price (price · 10^expo USD) to bucket_decimals units.
+/// expo is typically -8 for SOL/USD; target typically 2 (cents).
+pub fn scale_price(price: i64, expo: i32, bucket_decimals: u8) -> Result<u64> {
+    require!(price > 0, MarketError::InvalidOraclePrice);
+    require!((-12..=0).contains(&expo), MarketError::BadExponent);
+    let p = price as u128;
+    let shift = expo + bucket_decimals as i32; // e.g. -8 + 2 = -6 → divide by 1e6
+    let v = if shift >= 0 {
+        p.checked_mul(10u128.pow(shift as u32)).ok_or(MarketError::Overflow)?
+    } else {
+        p / 10u128.pow((-shift) as u32)
+    };
+    u64::try_from(v).map_err(|_| MarketError::Overflow.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +162,15 @@ mod tests {
                 last = w;
             }
         }
+    }
+
+    #[test]
+    fn scale_price_pyth_expo() {
+        // Pyth SOL/USD: price 15_130_000_000 @ expo -8 → $151.30 → 15_130 cents
+        assert_eq!(scale_price(15_130_000_000, -8, 2).unwrap(), 15_130);
+        // already coarser than target: price 1513 @ expo -1 → 15_130 cents
+        assert_eq!(scale_price(1_513, -1, 2).unwrap(), 15_130);
+        // expo 0: price 151 → 15_100 cents
+        assert_eq!(scale_price(151, 0, 2).unwrap(), 15_100);
     }
 }

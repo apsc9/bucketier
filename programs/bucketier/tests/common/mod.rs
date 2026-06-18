@@ -10,6 +10,9 @@ use solana_sdk::{
     system_program,
     transaction::Transaction,
 };
+use bucketier::pyth::{PriceFeedMessage, PriceUpdateV2, VerificationLevel,
+    PYTH_RECEIVER_ID, PRICE_UPDATE_V2_DISCRIMINATOR};
+use solana_sdk::account::Account as SolanaAccount;
 
 pub const SOL: u64 = 1_000_000_000;
 pub const SOL_USD_FEED: [u8; 32] = [7u8; 32]; // arbitrary in tests — must just match market.feed_id
@@ -218,5 +221,62 @@ pub fn refund_ix(market: &Pubkey, owner: &Pubkey, bucket: u8) -> Instruction {
             AccountMeta::new_readonly(system_program::ID, false),
         ],
         data: anchor_disc("claim_refund"),
+    }
+}
+
+
+/// Fabricate a PriceUpdateV2 owned by the Pyth receiver program directly in the SVM.
+/// PriceUpdateV2 is plain Borsh + discriminator — no Hermes/Wormhole needed in tests.
+/// Note: PriceUpdateV2.write_authority is Anchor's v3 Pubkey; use anchor_lang::prelude::Pubkey
+/// for construction. PYTH_RECEIVER_ID is also v3; convert to v2 for SolanaAccount.owner.
+pub fn inject_price_update(
+    svm: &mut LiteSVM,
+    feed_id: [u8; 32],
+    price: i64,
+    conf: u64,
+    exponent: i32,
+    publish_time: i64,
+) -> Pubkey {
+    let update = PriceUpdateV2 {
+        write_authority: anchor_lang::prelude::Pubkey::default(),
+        verification_level: VerificationLevel::Full,
+        price_message: PriceFeedMessage {
+            feed_id,
+            price,
+            conf,
+            exponent,
+            publish_time,
+            prev_publish_time: publish_time,
+            ema_price: price,
+            ema_conf: conf,
+        },
+        posted_slot: 1,
+    };
+    let mut data = PRICE_UPDATE_V2_DISCRIMINATOR.to_vec();
+    let mut update_buf = Vec::new();
+    update.serialize(&mut update_buf).unwrap();
+    data.extend(update_buf);
+    let pk = Pubkey::new_unique();
+    // Convert PYTH_RECEIVER_ID (Anchor v3 Pubkey) → solana-sdk v2 Pubkey for SolanaAccount.owner
+    let pyth_owner = Pubkey::new_from_array(PYTH_RECEIVER_ID.to_bytes());
+    svm.set_account(pk, SolanaAccount {
+        lamports: 10_000_000,
+        data,
+        owner: pyth_owner,
+        executable: false,
+        rent_epoch: 0,
+    }).unwrap();
+    pk
+}
+
+pub fn resolve_ix(market: &Pubkey, caller: &Pubkey, price_update: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: program_id(),
+        accounts: vec![
+            AccountMeta::new_readonly(*caller, true),
+            AccountMeta::new(*market, false),
+            AccountMeta::new_readonly(*price_update, false),
+        ],
+        data: anchor_disc("resolve_market"),
     }
 }

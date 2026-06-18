@@ -32,7 +32,7 @@ pub struct PriceUpdateV2 {
 }
 
 impl PriceUpdateV2 {
-    pub const LEN: usize = 32 + 2 + 32 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 8;
+    pub const LEN: usize = 32 + 1 + 32 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 8;
 
     pub fn try_deserialize(data: &[u8]) -> Result<Self> {
         require!(data.len() >= 8 + Self::LEN, ErrorCode::AccountDidNotDeserialize);

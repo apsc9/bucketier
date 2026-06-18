@@ -8,7 +8,7 @@ pub mod instructions;
 
 pub use instructions::*;
 
-declare_id!("9FJcX3zua4QdtxtBpKeHUy4JvxBHpEbqbHLKdp9Y4ya3");
+declare_id!("3YPmf5odBQdY3dbNWeTVk96EkGKumwvQnwGed4x8DrGA");
 
 #[program]
 pub mod bucketier {
@@ -28,5 +28,9 @@ pub mod bucketier {
     
     pub fn claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
         instructions::claim_refund::handler(ctx)
+    }
+
+    pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
+        instructions::resolve_market::handler(ctx)
     }
 }
