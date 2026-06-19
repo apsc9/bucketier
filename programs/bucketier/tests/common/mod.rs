@@ -280,3 +280,17 @@ pub fn resolve_ix(market: &Pubkey, caller: &Pubkey, price_update: &Pubkey) -> In
         data: anchor_disc("resolve_market"),
     }
 }
+
+pub fn claim_ix(market: &Pubkey, owner: &Pubkey, bucket: u8) -> Instruction {
+    Instruction { 
+        program_id: program_id(), 
+        accounts: vec![
+            AccountMeta::new(*owner, true),
+            AccountMeta::new_readonly(*market, false),
+            AccountMeta::new(position_pda(market, owner, bucket), false),
+            AccountMeta::new(vault_pda(market), false),
+            AccountMeta::new_readonly(system_program::ID, false),
+        ], 
+        data: anchor_disc("claim"), 
+    }
+}

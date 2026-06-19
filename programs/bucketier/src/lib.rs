@@ -33,4 +33,8 @@ pub mod bucketier {
     pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
         instructions::resolve_market::handler(ctx)
     }
+
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+        instructions::claim::handler(ctx)
+    }
 }
