@@ -8,11 +8,14 @@ skip-lint = false
 [programs.localnet]
 bucketier = "3YPmf5odBQdY3dbNWeTVk96EkGKumwvQnwGed4x8DrGA"
 
+[programs.devnet]
+bucketier = "3YPmf5odBQdY3dbNWeTVk96EkGKumwvQnwGed4x8DrGA"
+
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 300000 tests/**/*.ts"
 
 [hooks]

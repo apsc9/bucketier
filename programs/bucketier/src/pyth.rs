@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 pub const PYTH_RECEIVER_ID: Pubkey =
-    Pubkey::from_str_const("rec5EKMGg6MxZYaMdyBps68Vr6X7qAye4SYiKJHSHfq");
+    Pubkey::from_str_const("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
 
 pub const PRICE_UPDATE_V2_DISCRIMINATOR: [u8; 8] = [34, 241, 35, 99, 157, 126, 244, 205];
 
