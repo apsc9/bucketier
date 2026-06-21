@@ -6,6 +6,60 @@ Parimutuel scalar prediction market protocol on Solana. Users bet on price bucke
 
 Built for the [Turbin3](https://x.com/solanaturbine) Builders Cohort Q2 2026 capstone.
 
+## Demo — Full Market Lifecycle
+
+A live walkthrough on devnet: market seeded with 5 bot wallets, user places bets, market resolves via Pyth oracle, payouts claimed.
+
+### 1. Open Market — Seeded Pool
+
+Market open with 0.65 SOL pooled across 7 buckets by bot wallets. User selects bucket #3 ($73.66–$74.66) to bet on.
+
+<p align="center"><img src="assets/01-open-market.png" width="420" /></p>
+
+### 2. First Bet Placed
+
+0.05 SOL bet placed on bucket #3. Position appears showing 15.7% share of that bucket. Pool grows to 0.70 SOL.
+
+<p align="center"><img src="assets/02-bet-placed.png" width="420" /></p>
+
+### 3. Second Bet — Multiple Positions
+
+Another 0.05 SOL on bucket #2 ($72.66–$73.66). User now holds two positions totaling 0.10 SOL across two buckets.
+
+<p align="center"><img src="assets/03-second-bet.png" width="420" /></p>
+
+### 4. Betting Closed — Resolve Available
+
+Betting window expired. "Resolve market" button appears — anyone can trigger resolution permissionlessly.
+
+<p align="center"><img src="assets/04-betting-closed.png" width="420" /></p>
+
+### 5. Resolving with Pyth Oracle
+
+Resolution in progress — fetching historical SOL/USD price from Pyth Benchmarks at the exact resolution timestamp.
+
+<p align="center"><img src="assets/05-resolving.png" width="420" /></p>
+
+### 6. Market Resolved — Payouts Ready
+
+Pyth returned $74.24. Bucket #3 (containing $74.24) turns green as the winning bucket. Inverse-distance payouts calculated — bucket #3 position shows +0.0483 SOL, bucket #2 shows +0.0295 SOL. Closer bucket earns more.
+
+<p align="center"><img src="assets/06-resolved.png" width="420" /></p>
+
+### 7. Claiming Payouts
+
+Bucket #3 claimed. Position closed on-chain (double-claim protection). Remaining bucket #2 position still available to claim.
+
+<p align="center"><img src="assets/07-claim-partial.png" width="420" /></p>
+
+### 8. All Positions Claimed
+
+Both payouts collected. All position accounts closed. Rounding dust (sub-lamport) remains in vault.
+
+<p align="center"><img src="assets/08-all-claimed.png" width="420" /></p>
+
+---
+
 ## How It Works
 
 ### Concept
@@ -42,6 +96,104 @@ This ensures:
 - Proportionality: within a bucket, payout is proportional to stake
 
 Both properties are verified by proptest fuzz tests in `math.rs`.
+
+### Worked Example: 7-Bucket SOL/USD Market
+
+**Setup:** SOL is trading at ~$71.50. Market creates 7 buckets × $1.00 wide, covering $68–$75.
+
+```
+Bucket #0: $68.00–$69.00  (midpoint: $68.50)
+Bucket #1: $69.00–$70.00  (midpoint: $69.50)
+Bucket #2: $70.00–$71.00  (midpoint: $70.50)
+Bucket #3: $71.00–$72.00  (midpoint: $71.50)  ← center
+Bucket #4: $72.00–$73.00  (midpoint: $72.50)
+Bucket #5: $73.00–$74.00  (midpoint: $73.50)
+Bucket #6: $74.00–$75.00  (midpoint: $74.50)
+```
+
+**Bets placed (5 participants):**
+
+| Bettor | Bucket | Amount |
+|--------|--------|--------|
+| Alice  | #2     | 0.08 SOL |
+| Bob    | #3     | 0.12 SOL |
+| Carol  | #3     | 0.05 SOL |
+| Dave   | #5     | 0.10 SOL |
+| Eve    | #6     | 0.06 SOL |
+
+Bucket #0, #1, #4 have no bets (unfunded — excluded from weight sum).
+
+**Total pool = 0.41 SOL**
+
+Bucket totals: `#2: 0.08, #3: 0.17, #5: 0.10, #6: 0.06`
+
+---
+
+**Resolution:** Pyth oracle delivers SOL/USD = **$71.48** at resolution time.
+
+**Step 1 — Clamp outcome to midpoint range:**
+
+X = clamp($71.48, $68.50, $74.50) = $71.48 (already in range)
+
+**Step 2 — Compute distances (midpoint to outcome):**
+
+```
+d_2 = |$71.48 − $70.50| = $0.98   (0.98 bucket-widths)
+d_3 = |$71.48 − $71.50| = $0.02   (0.02 bucket-widths)  ← closest!
+d_5 = |$71.48 − $73.50| = $2.02   (2.02 bucket-widths)
+d_6 = |$71.48 − $74.50| = $3.02   (3.02 bucket-widths)
+```
+
+**Step 3 — Normalize and compute weights:**
+
+Formula: `W = SCALE² / (Dn + SCALE)` where `Dn = distance × SCALE / bucket_width`
+
+```
+Dn_2 = 0.98 × 10^9 = 980,000,000
+Dn_3 = 0.02 × 10^9 =  20,000,000
+Dn_5 = 2.02 × 10^9 = 2,020,000,000
+Dn_6 = 3.02 × 10^9 = 3,020,000,000
+
+W_2 = 10^18 / (980M + 1000M)  = 505,050,505   (~0.505 SCALE)
+W_3 = 10^18 / (20M  + 1000M)  = 980,392,156   (~0.980 SCALE) ← highest!
+W_5 = 10^18 / (2020M + 1000M) = 331,125,827   (~0.331 SCALE)
+W_6 = 10^18 / (3020M + 1000M) = 248,756,218   (~0.249 SCALE)
+```
+
+**Step 4 — Sum weights (funded buckets only):**
+
+```
+S = W_2 + W_3 + W_5 + W_6
+  = 505M + 980M + 331M + 249M
+  = 2,065,324,706
+```
+
+**Step 5 — Pool share per bucket:**
+
+```
+Bucket #2: 505M / 2065M = 24.5%  → 0.1003 SOL from pool
+Bucket #3: 980M / 2065M = 47.5%  → 0.1947 SOL from pool
+Bucket #5: 331M / 2065M = 16.0%  → 0.0657 SOL from pool
+Bucket #6: 249M / 2065M = 12.0%  → 0.0494 SOL from pool
+```
+
+**Step 6 — Individual payouts (proportional within bucket):**
+
+```
+Alice (#2, sole bettor): 0.08/0.08 × 0.1003 = 0.1003 SOL  (bet 0.08, profit +0.02)
+Bob   (#3, 0.12 of 0.17): 0.12/0.17 × 0.1947 = 0.1374 SOL  (bet 0.12, profit +0.02)
+Carol (#3, 0.05 of 0.17): 0.05/0.17 × 0.1947 = 0.0573 SOL  (bet 0.05, profit +0.01)
+Dave  (#5, sole bettor): 0.10/0.10 × 0.0657 = 0.0657 SOL  (bet 0.10, loss −0.03)
+Eve   (#6, sole bettor): 0.06/0.06 × 0.0494 = 0.0494 SOL  (bet 0.06, loss −0.01)
+```
+
+**Verification:** 0.1003 + 0.1374 + 0.0573 + 0.0657 + 0.0494 = 0.4101 ≈ 0.41 SOL ✓ (sub-lamport dust from truncation)
+
+**Key takeaways:**
+- Bucket #3 ($71–$72) was closest to outcome $71.48 → gets 47.5% of pool
+- Even far-away bucket #6 still gets 12% — "close but wrong" isn't zero
+- Within bucket #3, Bob and Carol split proportionally by stake (70.6% / 29.4%)
+- Unfunded buckets (#0, #1, #4) don't dilute the pool — their weight is excluded from sum
 
 ### Oracle Integration
 

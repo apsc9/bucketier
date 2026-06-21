@@ -1,0 +1,69 @@
+:root {
+  --bg: #0b0e17;
+  --surface: #141925;
+  --surface-2: #1c2233;
+  --border: #252d3f;
+  --text: #e2e8f0;
+  --text-dim: #64748b;
+  --text-muted: #475569;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --green: #10b981;
+  --green-dim: #064e3b;
+  --red: #ef4444;
+  --red-dim: #7f1d1d;
+  --amber: #f59e0b;
+  --amber-dim: #78350f;
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), 'SF Mono', 'Fira Code', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; }
+html, body { max-width: 100vw; overflow-x: hidden; }
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: inherit; text-decoration: none; }
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wallet-adapter-button {
+  font-family: var(--font-sans) !important;
+  font-size: 13px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  transition: border-color 0.15s !important;
+}
+.wallet-adapter-button:hover {
+  border-color: var(--accent) !important;
+}
+.wallet-adapter-modal-wrapper {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+}
+.wallet-adapter-modal-title {
+  font-family: var(--font-sans) !important;
+  color: var(--text) !important;
+}

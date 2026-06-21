@@ -10,3 +10,6 @@ test-ledger
 !.env.example
 deploy-devnet.sh
 package-lock.json
+app/.env.local
+app/.next
+app/node_modules
